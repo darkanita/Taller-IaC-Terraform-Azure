@@ -1,0 +1,71 @@
+name: "CD - Pipeline + Deploy Azure"
+on:
+  push:
+    branches: [dev, main]
+ 
+jobs:
+  # === DEPLOY DEV ===
+  deploy-dev:
+    name: "Deploy a Azure Dev"
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: https://${{ steps.get-url.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt
+ 
+      - name: Ejecutar pipeline ETL
+        env: { APP_ENV: development }
+        run: |
+          python src/pipeline.py
+          python src/dashboard.py
+          echo "Pipeline DEV completado"
+ 
+      - name: Deploy a Azure Static Web App (Dev)
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEV_TOKEN }}
+          action: "upload"
+          app_location: "output"
+          skip_app_build: true
+ 
+      - name: Obtener URL
+        id: get-url
+        run: echo "url=swa-pipeline-dev.azurestaticapps.net" >> $GITHUB_OUTPUT
+ 
+  # === DEPLOY PROD ===
+  deploy-prod:
+    name: "Deploy a Azure Prod"
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ steps.get-url.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt
+ 
+      - name: Ejecutar pipeline ETL
+        env: { APP_ENV: production }
+        run: |
+          python src/pipeline.py
+          python src/dashboard.py
+          echo "Pipeline PROD completado"
+ 
+      - name: Deploy a Azure Static Web App (Prod)
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_PROD_TOKEN }}
+          action: "upload"
+          app_location: "output"
+          skip_app_build: true
+ 
+      - name: Obtener URL
+        id: get-url
+        run: echo "url=swa-pipeline-prod.azurestaticapps.net" >> $GITHUB_OUTPUT
